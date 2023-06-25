@@ -16,7 +16,7 @@ connection.connect((err) => {
     start();
 });
 
-//
+// starts inquirer
 function start() {
     inquirer
     .prompt({
@@ -37,7 +37,7 @@ function start() {
             "Exit",
         ],
     })
-    //
+    // create answers for the choices given
     .then((answer) => {
         switch (answer.action) {
             case "View all departments":
