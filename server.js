@@ -3,14 +3,23 @@ const mysql = require('mysql2');
 
 const db = mysql.createConnection(
     {
-        host: 'employeeTracker_db',
-        user: 'localhost',
+        host: 'localhost',
+        user: 'root',
         port: 3306, 
         password: '',
         database: 'employeeTracker_db'
     },
     console.log(`Connected to the employeeTracker database.`)
 );
+
+db.connect((err) => {
+    if (err) {
+      throw err;
+    }
+    console.log('Connected to the database.');
+    // Call the start function to begin the application
+    start();
+  });
 
 // starts inquirer
 function start() {
@@ -19,7 +28,7 @@ function start() {
             type: "list",
             name: "action",
             message: "What would you like to do?",
-            Choices: [
+            choices: [
                 "View all departments",
                 "View all roles",
                 "Add a department",
@@ -28,10 +37,10 @@ function start() {
                 "Add A manager",
                 "Update an employee role",
                 "View employees by manager",
-                "View employes by department",
+                "View employees by department",
                 "Delete departments | Roles | Employees",
                 "Exit",
-            ],
+            ], 
         })
         // create answers for the choices given
         .then((answer) => {
@@ -45,21 +54,85 @@ function start() {
                 case "View employees":
                     viewAllEmployees();
                     break;
+                case "Add a role":
+                    addRole();
+                    break;
                 case "Add a department":
                     addDepartment();
                     break;
                 case "Add an employee":
                     addEmployee();
                     break;
+                case "Add an manager":
+                    addManager();
+                    break;
                 case "Update an employee role":
                     updateEmployeeRole();
                     break;
+                case "View employees by manager":
+                    viewEmployeesByManager();
+                    break;
+                case "View employees by department":
+                    viewEmployeesByDepartment();
+                    break;
+                case "Delete departments | Roles | Employees":
+                    deleteDepartmentsRolesEmployees();
+                    break; 
                 case "Exit":
                     db.end();
                     console.log("Bye");
                     break;
             }
         });
+}
+
+function addRole() {
+    const query = 'SELECT * FROM departments';
+    db.query(query, (err, res) => {
+        if (err) throw err;
+
+        inquirer
+            .prompt([
+                {
+                    type: 'input', 
+                    name: 'title',
+                    message: 'Enter the title of the new role:',
+                },
+                {
+                    type: 'input', 
+                    name: 'salary',
+                    message: 'Enter the salary of the new role:',
+                },
+                {
+                    type: 'list',
+                    name: 'department',
+                    message: 'Select the department for the new role:',
+                    choices: res.map((department) => department.department_name), 
+                },
+            ])
+            .then ((answers) => {
+                const department = res.find(
+                    (department) => 
+                        department.department_name === answers.department
+                );
+                const query = 'INSERT INTO roles SET ?';
+                db.query(
+                    query,
+                    {
+                        title: answers.title,
+                        salary: answers.salary,
+                        department_id: department.id,
+                    },
+                    (err, res) => {
+                        if (err) throw err;
+                        console.log(
+                            'Added role ${answers.title} with salary ${answers.salary} to the ${answers.department} department in the database.'
+                        );
+                        start();
+                    }
+                );
+            });
+    });
 }
 
 // function that allows you to view all the departments
@@ -119,7 +192,7 @@ function addDepartment() {
 }
 
 function addRole() {
-    const query = "SELECT * FROM department";
+    const query = "SELECT * FROM departments";
     db.query(query, (err, res) => {
         if (err) throw err;
         inquirer
@@ -145,7 +218,7 @@ function addRole() {
             ])
             .then((answers) => {
                 const department = res.find(
-                    (department) => department.name === answers.department
+                    (department) => department.department_name === answers.department
                 );
                 const query = "INSERT INTO roles SET ?";
                 db.query(
@@ -153,7 +226,7 @@ function addRole() {
                     {
                         title: answers.title,
                         salary: answers.salary,
-                        department_id: department,
+                        department_id: department.id,
                     },
                     (err, res) => {
                         if (err) throw err;
@@ -181,6 +254,10 @@ function addEmployee() {
             value: id,
         }));
 
+        console.log('Roles');
+        console.table(roles);
+
+
         // As a manager retrieve a list of employees from a database to use
         db.query(
             'SELECT id, CONCAT(first_name, " ", last_name) AS name FROM employee',
@@ -200,12 +277,12 @@ function addEmployee() {
                     .prompt([
                         {
                             type: "input",
-                            name: "firstname",
+                            name: "firstName",
                             message: "Enter the employee's first name:",
                         },
                         {
                             type: "input",
-                            name: "lastname",
+                            name: "lastName",
                             message: "Enter the employee's last name:",
                         },
                         {
@@ -229,8 +306,8 @@ function addEmployee() {
                         const sql =
                             "INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)";
                         const values = [
-                            answers.firstName,
-                            answers.lastName,
+                            answers.firstname,
+                            answers.lastname,
                             answers.roleId,
                             answers.managerId,
                         ];
@@ -273,7 +350,7 @@ function addManager() {
                     },
                     {
                         type: "list",
-                        name: "employess",
+                        name: "employees",
                         message: "Select the employee to add a manger to:",
                         choices: resEmployees.map(
                             (employee) =>
@@ -282,7 +359,7 @@ function addManager() {
                     },
                     {
                         type: "list",
-                        name: "manager",
+                        name: "employee",
                         message: "Select the employee's manager:",
                         choices: resEmployees.map(
                             (employee) =>
@@ -523,7 +600,7 @@ function deleteRole() {
                 choices: choices,
             })
             .then((answer) => {
-                if(answwer.roleID === null) {
+                if(answer.roleID === null) {
                     deleteDepartmentsRolesEmployees();
                     return;
                 }
@@ -541,7 +618,7 @@ function deleteRole() {
 
 // Deletes department
 function deleteDepartment() {
-    const query = "SELECT * FROM department";
+    const query = "SELECT * FROM departments";
     db.query(query, (err, res) => {
         if (err) throw err;
         const departmentChoices = res.map((department) => ({
@@ -565,7 +642,7 @@ function deleteDepartment() {
                     deleteDepartmentsRolesEmployees();
                 } else {
                     const query = "DELETE FROM departments WHERE id = ?";
-                    connection.query(
+                    db.query(
                         query,
                         [answer.departmentId],
                         (err, res) => {
